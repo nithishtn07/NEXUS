@@ -1,0 +1,23 @@
+{
+  "name": "nexus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "NEXUS - Private communication. Nothing more.",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "overrides": {
+    "expo-router": "~57.0.18"
+  },
+  "scripts": {
+    "dev:server": "cd apps/server && npm run dev",
+    "dev:mobile": "cd apps/mobile && npx expo start",
+    "build:server": "cd apps/server && npm run build",
+    "db:migrate": "cd apps/server && npx prisma migrate dev",
+    "db:generate": "cd apps/server && npx prisma generate",
+    "db:studio": "cd apps/server && npx prisma studio",
+    "test": "cd apps/server && npm test",
+    "lint": "cd apps/server && npm run lint"
+  }
+}
