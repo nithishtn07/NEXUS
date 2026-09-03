@@ -1,4 +1,4 @@
-package com.nexus.private
+package com.nexus.privateapp
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build

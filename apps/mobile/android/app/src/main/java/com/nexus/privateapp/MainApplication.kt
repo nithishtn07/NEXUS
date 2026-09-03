@@ -1,4 +1,4 @@
-package com.nexus.private
+package com.nexus.privateapp
 
 import android.app.Application
 import android.content.res.Configuration

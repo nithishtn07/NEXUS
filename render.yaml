@@ -1,0 +1,54 @@
+services:
+  - type: web
+    name: nexus-api
+    runtime: node
+    plan: free
+    buildCommand: npm install && cd apps/server && npx prisma generate && npm run build
+    startCommand: cd apps/server && bash start.sh
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: "30d"
+      - key: SESSION_MAX_AGE_DAYS
+        value: "30"
+      - key: MAX_SESSIONS
+        value: "5"
+      - key: STORAGE_ENDPOINT
+        sync: false
+      - key: STORAGE_ACCESS_KEY
+        sync: false
+      - key: STORAGE_SECRET_KEY
+        sync: false
+      - key: STORAGE_BUCKET
+        value: nexus-storage
+      - key: STORAGE_REGION
+        value: us-east-1
+      - key: STORAGE_PUBLIC_URL
+        value: ""
+      - key: EXPO_PROJECT_ID
+        sync: false
+      - key: EXPO_ACCESS_TOKEN
+        sync: false
+      - key: CORS_ORIGIN
+        value: "*"
+      - key: LOGIN_RATE_LIMIT
+        value: "5"
+      - key: INVITATION_RATE_LIMIT
+        value: "10"
+      - key: GENERAL_RATE_LIMIT
+        value: "100"
+      - key: INVITATION_EXPIRATION_HOURS
+        value: "48"
+      - key: MAX_UPLOAD_SIZE
+        value: "10485760"
+      - key: MAX_AUDIO_UPLOAD_SIZE
+        value: "20971520"
+      - key: STUN_URLS
+        value: "stun:stun.l.google.com:19302,stun:stun1.l.google.com:19302"
+    healthCheckPath: /api/health
+    autoDeploy: false

@@ -13,7 +13,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
 
   ios: {
     supportsTablet: false,
-    bundleIdentifier: 'com.nexus.private',
+    bundleIdentifier: 'com.nexus.privateapp',
     buildNumber: '1',
     infoPlist: {
       CFBundleDisplayName: 'NEXUS',
@@ -32,7 +32,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       foregroundImage: './assets/adaptive-icon.png',
       backgroundColor: '#0a0a0f',
     },
-    package: 'com.nexus.private',
+    package: 'com.nexus.privateapp',
     versionCode: 1,
     permissions: [
       'CAMERA',
@@ -116,7 +116,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   },
   extra: {
     eas: {
-      projectId: process.env.EXPO_PROJECT_ID || '',
+      projectId: 'fd449122-f892-438c-9fee-2aa9c0970b4a',
     },
   },
 });
