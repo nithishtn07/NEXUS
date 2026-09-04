@@ -13,7 +13,9 @@ const typingUsers = new Map<string, { userId: string; timeout: NodeJS.Timeout }>
 export function initializeSocket(server: http.Server): SocketIOServer {
   const io = new SocketIOServer(server, {
     cors: {
-      origin: config.isProduction ? config.cors.origin.split(',') : true,
+      origin: config.isProduction
+        ? (config.cors.origin === '*' ? true : config.cors.origin.split(','))
+        : true,
       methods: ['GET', 'POST'],
       credentials: true,
     },

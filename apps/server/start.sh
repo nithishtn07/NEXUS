@@ -2,7 +2,7 @@
 set -e
 
 echo "Running database migrations..."
-npx prisma migrate deploy
+npx prisma migrate deploy || npx prisma db push --skip-generate || true
 
 echo "Generating Prisma client..."
 npx prisma generate

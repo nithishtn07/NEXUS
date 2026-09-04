@@ -22,7 +22,9 @@ const server = http.createServer(app);
 // ---- Middleware ----
 app.use(helmet());
 app.use(cors({
-  origin: config.isProduction ? config.cors.origin.split(',') : true,
+  origin: config.isProduction
+    ? (config.cors.origin === '*' ? true : config.cors.origin.split(','))
+    : true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
