@@ -48,7 +48,7 @@ export default function SettingsScreen() {
         onPress: async () => {
           setIsLoggingOut(true);
           await logout();
-          router.replace('/auth' as any);
+          router.replace('/auth/login');
         },
       },
     ]);
@@ -108,7 +108,7 @@ export default function SettingsScreen() {
             try {
               await api.deleteAccount();
               await logout();
-              router.replace('/auth' as any);
+              router.replace('/auth/login');
             } catch {
               Alert.alert('Error', 'Failed to delete account');
             }

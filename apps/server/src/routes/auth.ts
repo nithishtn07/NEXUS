@@ -172,6 +172,8 @@ router.post('/setup', loginRateLimit, async (req, res: Response): Promise<void> 
           id: result.id,
           username: result.username,
           displayName: result.displayName,
+          email: result.email,
+          role: result.role,
           avatarUrl: result.avatarUrl,
           status: result.status,
           isOnline: true,
@@ -292,6 +294,8 @@ router.post('/login', loginRateLimit, async (req, res: Response): Promise<void> 
           id: user.id,
           username: user.username,
           displayName: user.displayName,
+          email: user.email,
+          role: user.role,
           avatarUrl: user.avatarUrl,
           status: user.status,
           isOnline: true,
@@ -314,68 +318,70 @@ router.post('/login', loginRateLimit, async (req, res: Response): Promise<void> 
 // ---- POST /api/auth/register ----
 router.post('/register', loginRateLimit, async (req, res: Response): Promise<void> => {
   try {
-    const parsed = registerSchema.safeParse(req.body);
+    const schema = z.object({
+      username: z.string().min(3).max(30),
+      email: z.string().email(),
+      password: z.string().min(8).max(128),
+      displayName: z.string().min(1).max(50),
+      invitationToken: z.string().min(1),
+      deviceName: z.string().max(100).optional(),
+    });
+
+    const parsed = schema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({
         success: false,
-        error: { code: 'VALIDATION_ERROR', message: 'Invalid input' },
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: parsed.error.errors[0]?.message || 'Invalid input',
+        },
       });
       return;
     }
 
     const { username, email, password, displayName, invitationToken, deviceName } = parsed.data;
 
-    // Validate inputs
-    if (!validateEmail(email)) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_EMAIL', message: 'Invalid email address' },
-      });
-      return;
-    }
-
-    if (!validateUsername(username)) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'INVALID_USERNAME', message: 'Username must be 3-30 characters, alphanumeric with underscores/hyphens' },
-      });
-      return;
-    }
-
-    const passwordValidation = validatePasswordStrength(password);
-    if (!passwordValidation.valid) {
-      res.status(400).json({
-        success: false,
-        error: { code: 'WEAK_PASSWORD', message: passwordValidation.errors[0] },
-      });
-      return;
-    }
-
-    // Validate invitation
+    // Validate invitation token
     const tokenHash = generateTokenHash(invitationToken);
     const invitation = await prisma.invitation.findUnique({
       where: { tokenHash },
     });
 
-    if (!invitation || invitation.usedAt || new Date() > invitation.expiresAt) {
+    if (!invitation) {
       res.status(400).json({
         success: false,
-        error: { code: 'INVALID_INVITATION', message: 'Invalid or expired invitation' },
+        error: { code: 'INVALID_INVITATION', message: 'Invalid invitation token' },
       });
       return;
     }
 
-    // Check two-user limit
+    if (invitation.usedAt) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVITATION_USED', message: 'This invitation has already been used' },
+      });
+      return;
+    }
+
+    if (new Date() > invitation.expiresAt) {
+      res.status(400).json({
+        success: false,
+        error: { code: 'INVITATION_EXPIRED', message: 'This invitation has expired' },
+      });
+      return;
+    }
+
+    // Check space limit (max 2 users)
     const userCount = await prisma.user.count();
     if (userCount >= 2) {
       res.status(400).json({
         success: false,
-        error: { code: 'SPACE_FULL', message: 'This communication space is full' },
+        error: { code: 'SPACE_FULL', message: 'This private space is full (maximum 2 users)' },
       });
       return;
     }
 
-    // Check uniqueness
+    // Check unique email/username
     const existingUser = await prisma.user.findFirst({
       where: { OR: [{ email }, { username }] },
     });
@@ -470,6 +476,8 @@ router.post('/register', loginRateLimit, async (req, res: Response): Promise<voi
           id: result.id,
           username: result.username,
           displayName: result.displayName,
+          email: result.email,
+          role: result.role,
           avatarUrl: result.avatarUrl,
           status: result.status,
           isOnline: true,

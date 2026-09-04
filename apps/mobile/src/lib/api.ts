@@ -2,6 +2,13 @@ import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosError } from 'ax
 import * as SecureStore from 'expo-secure-store';
 import { config } from './config';
 
+type AuthErrorHandler = () => void;
+let onUnauthorizedCallback: AuthErrorHandler | null = null;
+
+export function setOnUnauthorized(handler: AuthErrorHandler) {
+  onUnauthorizedCallback = handler;
+}
+
 class ApiClient {
   private client: AxiosInstance;
   private static instance: ApiClient;
@@ -18,24 +25,38 @@ class ApiClient {
     // Request interceptor - attach token
     this.client.interceptors.request.use(
       async (reqConfig: InternalAxiosRequestConfig) => {
+        console.log(`[API Request] ${reqConfig.method?.toUpperCase()} ${reqConfig.baseURL}${reqConfig.url}`);
         const token = await SecureStore.getItemAsync('auth_token');
         if (token && reqConfig.headers) {
           reqConfig.headers.Authorization = `Bearer ${token}`;
         }
         return reqConfig;
       },
-      (error) => Promise.reject(error),
+      (error) => {
+        console.error('[API Request Config Error]', error);
+        return Promise.reject(error);
+      },
     );
 
     // Response interceptor - handle errors
     this.client.interceptors.response.use(
-      (response) => response,
-      async (error: AxiosError) => {
+      (response) => {
+        console.log(`[API Response] ${response.status} ${response.config.url}`);
+        return response;
+      },
+      async (error: AxiosError<{ success?: boolean; error?: { code?: string; message?: string } }>) => {
+        console.warn(`[API Error] ${error.config?.url}:`, error.message, error.response?.data || error.code);
         if (error.response?.status === 401) {
-          // Token expired or invalid
+          // Token expired, invalid or authentication required
           await SecureStore.deleteItemAsync('auth_token');
           await SecureStore.deleteItemAsync('auth_expires_at');
-          // The auth state will be updated and navigation will happen
+          if (onUnauthorizedCallback) {
+            onUnauthorizedCallback();
+          }
+        }
+        const serverMsg = error.response?.data?.error?.message;
+        if (serverMsg) {
+          error.message = serverMsg;
         }
         return Promise.reject(error);
       },
@@ -51,6 +72,11 @@ class ApiClient {
 
   get instance() {
     return this.client;
+  }
+
+  async checkHealth() {
+    const response = await this.client.get('/health');
+    return response.data;
   }
 
   // ---- Auth ----

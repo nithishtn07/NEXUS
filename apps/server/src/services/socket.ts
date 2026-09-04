@@ -1,6 +1,6 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
 import http from 'http';
-import { verifyJWT, generateTokenHash } from '../lib/crypto';
+import { verifyJWT } from '../lib/crypto';
 import prisma from '../lib/prisma';
 import { config } from '../config';
 import { AuthenticatedSocket } from '../types';
@@ -13,7 +13,7 @@ const typingUsers = new Map<string, { userId: string; timeout: NodeJS.Timeout }>
 export function initializeSocket(server: http.Server): SocketIOServer {
   const io = new SocketIOServer(server, {
     cors: {
-      origin: config.cors.origin.split(','),
+      origin: config.isProduction ? config.cors.origin.split(',') : true,
       methods: ['GET', 'POST'],
       credentials: true,
     },
@@ -40,9 +40,8 @@ export function initializeSocket(server: http.Server): SocketIOServer {
       }
 
       // Verify session
-      const tokenHash = generateTokenHash(token);
       const session = await prisma.session.findUnique({
-        where: { tokenHash },
+        where: { id: decoded.sessionId },
       });
 
       if (!session || session.revokedAt || new Date() > session.expiresAt) {

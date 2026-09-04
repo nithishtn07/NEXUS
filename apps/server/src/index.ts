@@ -22,7 +22,7 @@ const server = http.createServer(app);
 // ---- Middleware ----
 app.use(helmet());
 app.use(cors({
-  origin: config.cors.origin.split(','),
+  origin: config.isProduction ? config.cors.origin.split(',') : true,
   credentials: true,
 }));
 app.use(express.json({ limit: '10mb' }));
@@ -74,8 +74,8 @@ app.use((_req, res) => {
 const io = initializeSocket(server);
 
 // ---- Start Server ----
-server.listen(config.port, () => {
-  console.log(`NEXUS server running on port ${config.port}`);
+server.listen(config.port, '0.0.0.0', () => {
+  console.log(`NEXUS server running on port ${config.port} (0.0.0.0)`);
   console.log(`Environment: ${config.nodeEnv}`);
   console.log(`WebSocket: enabled`);
 });

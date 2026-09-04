@@ -18,7 +18,7 @@ import { ConnectionIndicator } from '../../components/ui/ConnectionIndicator';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function HomeScreen() {
-  const { user } = useAuthStore();
+  const { user, isAuthenticated, token } = useAuthStore();
   const { conversations, setConversations, setActiveConversation, connectionStatus } = useChatStore();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -40,6 +40,7 @@ export default function HomeScreen() {
   const [createdInvitation, setCreatedInvitation] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
+    if (!isAuthenticated || !token) return;
     try {
       const [conversationsRes, partnerRes] = await Promise.all([
         api.getConversations(),
@@ -67,7 +68,7 @@ export default function HomeScreen() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [user?.role, setConversations]);
+  }, [isAuthenticated, token, user?.role, setConversations]);
 
   useEffect(() => {
     loadData();

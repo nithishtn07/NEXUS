@@ -1,7 +1,3 @@
-// ============================================
-// NEXUS Database Schema
-// ============================================
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -11,40 +7,36 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// ---- User ----
 model User {
-  id           String    @id @default(uuid())
-  username     String    @unique
-  email        String    @unique
-  displayName  String
-  passwordHash String
-  avatarUrl    String?
-  status       String?
-  role         String    @default("member") // "owner" | "member"
-  createdAt    DateTime  @default(now())
-  updatedAt    DateTime  @updatedAt
-  lastSeenAt   DateTime?
-
-  // Relations
-  sessions            Session[]
+  id                  String               @id @default(uuid())
+  username            String               @unique
+  email               String               @unique
+  displayName         String
+  passwordHash        String
+  avatarUrl           String?
+  status              String?
+  role                String               @default("member")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  lastSeenAt          DateTime?
+  auditLogs           AuditLog[]
+  callsMade           CallSession[]        @relation("Caller")
+  callsReceived       CallSession[]        @relation("Receiver")
+  conversationMembers ConversationMember[]
+  devices             Device[]
   invitationsCreated  Invitation[]         @relation("Creator")
   invitationsUsed     Invitation?          @relation("UsedInvitation")
-  conversationMembers ConversationMember[]
   messages            Message[]
   messageReactions    MessageReaction[]
   messageReadReceipts MessageRead[]
-  devices             Device[]
-  auditLogs           AuditLog[]
+  sessions            Session[]
   settings            UserSettings?
-  callsMade           CallSession[]        @relation("Caller")
-  callsReceived       CallSession[]        @relation("Receiver")
 
   @@index([email])
   @@index([username])
   @@index([role])
 }
 
-// ---- Session ----
 model Session {
   id         String    @id @default(uuid())
   userId     String
@@ -57,15 +49,13 @@ model Session {
   expiresAt  DateTime
   revokedAt  DateTime?
   lastSeenAt DateTime  @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([tokenHash])
   @@index([expiresAt])
 }
 
-// ---- Invitation ----
 model Invitation {
   id        String    @id @default(uuid())
   tokenHash String    @unique
@@ -74,99 +64,87 @@ model Invitation {
   usedAt    DateTime?
   usedBy    String?   @unique
   createdAt DateTime  @default(now())
-
-  creator User  @relation("Creator", fields: [createdBy], references: [id], onDelete: Cascade)
-  user    User? @relation("UsedInvitation", fields: [usedBy], references: [id], onDelete: SetNull)
+  creator   User      @relation("Creator", fields: [createdBy], references: [id], onDelete: Cascade)
+  user      User?     @relation("UsedInvitation", fields: [usedBy], references: [id])
 
   @@index([tokenHash])
   @@index([createdBy])
 }
 
-// ---- Conversation ----
 model Conversation {
-  id        String   @id @default(uuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id           String               @id @default(uuid())
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  callSessions CallSession[]
   members      ConversationMember[]
   messages     Message[]
-  callSessions CallSession[]
 
   @@index([updatedAt])
 }
 
-// ---- ConversationMember ----
 model ConversationMember {
-  id             String @id @default(uuid())
+  id             String       @id @default(uuid())
   conversationId String
   userId         String
-
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([conversationId, userId])
   @@index([conversationId])
   @@index([userId])
 }
 
-// ---- Message ----
 model Message {
-  id             String    @id @default(uuid())
+  id             String            @id @default(uuid())
   conversationId String
   senderId       String
   content        String?
-  type           String    @default("text") // "text" | "image" | "voice" | "system"
+  type           String            @default("text")
   replyToId      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
   editedAt       DateTime?
   deletedAt      DateTime?
-
-  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
-  replyTo      Message?          @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
-  replies      Message[]         @relation("Replies")
-  reactions    MessageReaction[]
-  readReceipts MessageRead[]
-  attachments  Attachment[]
+  attachments    Attachment[]
+  conversation   Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  replyTo        Message?          @relation("Replies", fields: [replyToId], references: [id])
+  replies        Message[]         @relation("Replies")
+  sender         User              @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  reactions      MessageReaction[]
+  readReceipts   MessageRead[]
 
   @@index([conversationId, createdAt])
   @@index([senderId])
   @@index([replyToId])
 }
 
-// ---- MessageReaction ----
 model MessageReaction {
   id        String   @id @default(uuid())
   messageId String
   userId    String
   reaction  String
   createdAt DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId, reaction])
   @@index([messageId])
   @@index([userId])
 }
 
-// ---- MessageRead ----
 model MessageRead {
   id        String   @id @default(uuid())
   messageId String
   userId    String
   readAt    DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
-  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([messageId, userId])
   @@index([messageId])
   @@index([userId])
 }
 
-// ---- Attachment ----
 model Attachment {
   id           String   @id @default(uuid())
   messageId    String
@@ -176,30 +154,27 @@ model Attachment {
   width        Int?
   height       Int?
   thumbnailKey String?
-  duration     Float? // duration in seconds for audio/voice
+  duration     Float?
   createdAt    DateTime @default(now())
-
-  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message      Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
   @@index([messageId])
 }
 
-// ---- CallSession (call history) ----
 model CallSession {
-  id             String    @id @default(uuid())
+  id             String       @id @default(uuid())
   callerId       String
   receiverId     String
   conversationId String
-  callType       String // "voice" | "video"
-  status         String    @default("missed") // "missed" | "declined" | "answered" | "ended" | "busy" | "cancelled"
-  startedAt      DateTime  @default(now())
+  callType       String
+  status         String       @default("missed")
+  startedAt      DateTime     @default(now())
   answeredAt     DateTime?
   endedAt        DateTime?
-  duration       Int? // duration in seconds
-
-  caller       User         @relation("Caller", fields: [callerId], references: [id], onDelete: Cascade)
-  receiver     User         @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  duration       Int?
+  caller         User         @relation("Caller", fields: [callerId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  receiver       User         @relation("Receiver", fields: [receiverId], references: [id], onDelete: Cascade)
 
   @@index([callerId])
   @@index([receiverId])
@@ -208,23 +183,20 @@ model CallSession {
   @@index([status])
 }
 
-// ---- Device ----
 model Device {
   id         String   @id @default(uuid())
   userId     String
   pushToken  String?
-  platform   String // "ios" | "android" | "web"
+  platform   String
   deviceName String?
   createdAt  DateTime @default(now())
   lastSeenAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([pushToken])
 }
 
-// ---- UserSettings ----
 model UserSettings {
   id                   String   @id @default(uuid())
   userId               String   @unique
@@ -235,14 +207,12 @@ model UserSettings {
   showOnlineStatus     Boolean  @default(true)
   showLastSeen         Boolean  @default(true)
   showReadReceipts     Boolean  @default(true)
-  theme                String   @default("dark") // "dark" | "light" | "system"
+  theme                String   @default("dark")
   reducedMotion        Boolean  @default(false)
   updatedAt            DateTime @updatedAt
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
-// ---- AuditLog ----
 model AuditLog {
   id        String   @id @default(uuid())
   userId    String
@@ -250,8 +220,7 @@ model AuditLog {
   metadata  Json?
   ipAddress String?
   createdAt DateTime @default(now())
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([action])

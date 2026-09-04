@@ -1,22 +1,29 @@
 import { useEffect } from 'react';
-import { Tabs } from 'expo-router';
-import { useColorScheme } from 'react-native';
+import { Tabs, Redirect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore, socketManager } from '../../lib/store';
 import { Colors, FontSize } from '../../constants/theme';
 
 export default function AppLayout() {
-  const { token, user } = useAuthStore();
+  const { token, isAuthenticated, isLoading } = useAuthStore();
 
   useEffect(() => {
-    if (token) {
+    if (token && isAuthenticated) {
       socketManager.connect(token);
     }
 
     return () => {
       socketManager.disconnect();
     };
-  }, [token]);
+  }, [token, isAuthenticated]);
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isAuthenticated || !token) {
+    return <Redirect href="/auth/login" />;
+  }
 
   return (
     <Tabs

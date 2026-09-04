@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import * as SecureStore from 'expo-secure-store';
-import { api } from './api';
+import { api, setOnUnauthorized } from './api';
 import { io, Socket } from 'socket.io-client';
 import { config } from './config';
 
@@ -138,9 +138,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.setItemAsync('auth_token', response.data.token);
       await SecureStore.setItemAsync('auth_expires_at', response.data.expiresAt);
       set({
-        user: { ...response.data.user, email, settings: null, role: 'member', isOnline: true },
+        user: {
+          ...response.data.user,
+          email,
+          settings: null,
+          role: response.data.user.role || 'member',
+          isOnline: true,
+        },
         token: response.data.token,
         isAuthenticated: true,
+        isLoading: false,
+        isSetupComplete: true,
       });
     } else {
       throw new Error(response.error?.message || 'Login failed');
@@ -153,9 +161,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.setItemAsync('auth_token', response.data.token);
       await SecureStore.setItemAsync('auth_expires_at', response.data.expiresAt);
       set({
-        user: { ...response.data.user, email: data.email, settings: null, role: 'owner', isOnline: true },
+        user: {
+          ...response.data.user,
+          email: data.email,
+          settings: null,
+          role: 'owner',
+          isOnline: true,
+        },
         token: response.data.token,
         isAuthenticated: true,
+        isLoading: false,
         isSetupComplete: true,
       });
     } else {
@@ -169,9 +184,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       await SecureStore.setItemAsync('auth_token', response.data.token);
       await SecureStore.setItemAsync('auth_expires_at', response.data.expiresAt);
       set({
-        user: { ...response.data.user, email: data.email, settings: null, role: 'member', isOnline: true },
+        user: {
+          ...response.data.user,
+          email: data.email,
+          settings: null,
+          role: response.data.user.role || 'member',
+          isOnline: true,
+        },
         token: response.data.token,
         isAuthenticated: true,
+        isLoading: false,
+        isSetupComplete: true,
       });
     } else {
       throw new Error(response.error?.message || 'Registration failed');
@@ -186,10 +209,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
     await SecureStore.deleteItemAsync('auth_token');
     await SecureStore.deleteItemAsync('auth_expires_at');
+    socketManager.disconnect();
     set({
       user: null,
       token: null,
       isAuthenticated: false,
+      isLoading: false,
     });
   },
 
@@ -199,21 +224,33 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const expiresAt = await SecureStore.getItemAsync('auth_expires_at');
 
       if (!token || !expiresAt) {
-        set({ isLoading: false, isSetupComplete: false });
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isSetupComplete: false,
+        });
         return;
       }
 
       // Check if token is expired
-      if (new Date(expiresAt) < new Date()) {
+      if (new Date(expiresAt) <= new Date()) {
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('auth_expires_at');
-        set({ isLoading: false, isSetupComplete: false });
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isSetupComplete: false,
+        });
         return;
       }
 
       // Fetch user data
       const response = await api.getMe();
-      if (response.success) {
+      if (response && response.success && response.data) {
         set({
           user: { ...response.data, isOnline: true },
           token,
@@ -224,10 +261,25 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       } else {
         await SecureStore.deleteItemAsync('auth_token');
         await SecureStore.deleteItemAsync('auth_expires_at');
-        set({ isLoading: false, isSetupComplete: false });
+        set({
+          user: null,
+          token: null,
+          isAuthenticated: false,
+          isLoading: false,
+          isSetupComplete: false,
+        });
       }
-    } catch {
-      set({ isLoading: false, isSetupComplete: false });
+    } catch (err) {
+      console.warn('[restoreSession] Session restore failed:', err);
+      await SecureStore.deleteItemAsync('auth_token');
+      await SecureStore.deleteItemAsync('auth_expires_at');
+      set({
+        user: null,
+        token: null,
+        isAuthenticated: false,
+        isLoading: false,
+        isSetupComplete: false,
+      });
     }
   },
 
@@ -397,7 +449,16 @@ class SocketManager {
   private maxReconnectAttempts = 10;
 
   async connect(token: string) {
-    if (this.socket?.connected) return;
+    console.log(`[SocketManager] Initiating connection to ${config.wsUrl}...`);
+    if (this.socket?.connected) {
+      console.log('[SocketManager] Already connected to socket');
+      return;
+    }
+
+    if (this.socket) {
+      this.socket.disconnect();
+      this.socket = null;
+    }
 
     this.socket = io(config.wsUrl, {
       auth: { token },
@@ -410,17 +471,18 @@ class SocketManager {
     });
 
     this.socket.on('connect', () => {
-      console.log('Socket connected');
+      console.log('[SocketManager] Socket connected successfully! socketId:', this.socket?.id);
       useChatStore.getState().setConnectionStatus('connected');
       this.reconnectAttempts = 0;
     });
 
     this.socket.on('disconnect', (reason) => {
-      console.log('Socket disconnected:', reason);
+      console.log('[SocketManager] Socket disconnected:', reason);
       useChatStore.getState().setConnectionStatus('offline');
     });
 
-    this.socket.on('connect_error', () => {
+    this.socket.on('connect_error', (error: any) => {
+      console.warn('[SocketManager] Socket connect_error:', error?.message || error);
       this.reconnectAttempts++;
       useChatStore.getState().setConnectionStatus('reconnecting');
     });
@@ -430,6 +492,7 @@ class SocketManager {
 
   disconnect() {
     if (this.socket) {
+      console.log('[SocketManager] Disconnecting socket...');
       this.socket.disconnect();
       this.socket = null;
     }
@@ -672,3 +735,19 @@ class SocketManager {
 }
 
 export const socketManager = new SocketManager();
+
+// Register unauthorized handler to reset auth state and disconnect socket
+setOnUnauthorized(() => {
+  const current = useAuthStore.getState();
+  if (current.isAuthenticated || current.token || current.user) {
+    console.warn('[Auth] Received 401 Unauthorized - clearing session');
+    useAuthStore.setState({
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+    });
+    socketManager.disconnect();
+  }
+});
+

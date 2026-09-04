@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { Stack } from 'expo-router';
+import { Stack, useRouter, useSegments } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
@@ -9,16 +9,40 @@ import { Colors } from '../constants/theme';
 
 SplashScreen.preventAutoHideAsync();
 
+function useProtectedRoute(isAuthenticated: boolean, isLoading: boolean) {
+  const segments = useSegments();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (isLoading) return;
+
+    const inAuthGroup = segments[0] === 'auth';
+
+    if (!isAuthenticated && !inAuthGroup) {
+      router.replace('/auth/login');
+    } else if (isAuthenticated && inAuthGroup) {
+      router.replace('/(app)');
+    }
+  }, [isAuthenticated, isLoading, segments, router]);
+}
+
 export default function RootLayout() {
   const { isAuthenticated, isLoading, restoreSession } = useAuthStore();
 
+  useProtectedRoute(isAuthenticated, isLoading);
+
   useEffect(() => {
     async function prepare() {
-      await restoreSession();
-      await SplashScreen.hideAsync();
+      try {
+        await restoreSession();
+      } catch (err) {
+        console.warn('[RootLayout] Error restoring session:', err);
+      } finally {
+        await SplashScreen.hideAsync();
+      }
     }
     prepare();
-  }, []);
+  }, [restoreSession]);
 
   return (
     <GestureHandlerRootView style={styles.container}>
@@ -30,13 +54,9 @@ export default function RootLayout() {
           animation: 'fade',
         }}
       >
-        {isLoading ? (
-          <Stack.Screen name="splash" />
-        ) : !isAuthenticated ? (
-          <Stack.Screen name="auth" />
-        ) : (
-          <Stack.Screen name="(app)" />
-        )}
+        <Stack.Screen name="splash" />
+        <Stack.Screen name="auth" />
+        <Stack.Screen name="(app)" />
       </Stack>
     </GestureHandlerRootView>
   );

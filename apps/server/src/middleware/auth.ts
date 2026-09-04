@@ -1,5 +1,5 @@
 import { Response, NextFunction } from 'express';
-import { verifyJWT, generateTokenHash } from '../lib/crypto';
+import { verifyJWT } from '../lib/crypto';
 import { AuthenticatedRequest } from '../types';
 import prisma from '../lib/prisma';
 
@@ -31,9 +31,8 @@ export async function authenticate(
     }
 
     // Verify session is still valid
-    const tokenHash = generateTokenHash(token);
     const session = await prisma.session.findUnique({
-      where: { tokenHash },
+      where: { id: decoded.sessionId },
       include: { user: true },
     });
 
