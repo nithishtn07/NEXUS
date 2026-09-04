@@ -1,17 +1,35 @@
 import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+import fs from 'fs';
+import path from 'path';
+import crypto from 'crypto';
 import { config } from '../config';
 
-// S3-compatible cloud storage client (works with AWS S3, DigitalOcean Spaces, Backblaze B2, etc.)
-const s3Client = new S3Client({
-  endpoint: config.storage.endpoint,
-  region: config.storage.region,
-  credentials: {
-    accessKeyId: config.storage.accessKey,
-    secretAccessKey: config.storage.secretKey,
-  },
-  forcePathStyle: true,
-});
+// Detect if valid S3 credentials are provided
+const isS3Configured = Boolean(
+  config.storage.endpoint &&
+  config.storage.accessKey &&
+  config.storage.secretKey &&
+  !config.storage.endpoint.includes('your-region') &&
+  !config.storage.accessKey.includes('your-access-key')
+);
+
+const s3Client = isS3Configured
+  ? new S3Client({
+      endpoint: config.storage.endpoint,
+      region: config.storage.region,
+      credentials: {
+        accessKeyId: config.storage.accessKey,
+        secretAccessKey: config.storage.secretKey,
+      },
+      forcePathStyle: true,
+    })
+  : null;
+
+const UPLOADS_DIR = path.resolve(process.cwd(), 'uploads');
+if (!isS3Configured && !fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
 
 export interface UploadResult {
   key: string;
@@ -24,33 +42,47 @@ export async function uploadFile(
   key: string,
   mimeType: string,
 ): Promise<UploadResult> {
-  const command = new PutObjectCommand({
-    Bucket: config.storage.bucket,
-    Key: key,
-    Body: buffer,
-    ContentType: mimeType,
-    // Make object private by default - use signed URLs for access
-    ACL: 'private',
-  });
+  if (s3Client) {
+    const command = new PutObjectCommand({
+      Bucket: config.storage.bucket,
+      Key: key,
+      Body: buffer,
+      ContentType: mimeType,
+      ACL: 'private',
+    });
+    await s3Client.send(command);
 
-  await s3Client.send(command);
+    return {
+      key,
+      url: config.storage.publicUrl
+        ? `${config.storage.publicUrl}/${key}`
+        : key,
+      size: buffer.length,
+    };
+  }
+
+  // Fallback to local storage
+  const filePath = path.join(UPLOADS_DIR, key.replace(/\//g, '_'));
+  await fs.promises.writeFile(filePath, buffer);
 
   return {
     key,
-    url: config.storage.publicUrl
-      ? `${config.storage.publicUrl}/${key}`
-      : key,
+    url: `/api/attachments/raw/${encodeURIComponent(key)}`,
     size: buffer.length,
   };
 }
 
 export async function getSignedDownloadUrl(key: string, expiresIn: number = 3600): Promise<string> {
-  const command = new GetObjectCommand({
-    Bucket: config.storage.bucket,
-    Key: key,
-  });
+  if (s3Client) {
+    const command = new GetObjectCommand({
+      Bucket: config.storage.bucket,
+      Key: key,
+    });
+    return getSignedUrl(s3Client, command, { expiresIn });
+  }
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  // Fallback URL for local file
+  return `/api/attachments/raw/${encodeURIComponent(key)}`;
 }
 
 export async function getSignedUploadUrl(
@@ -58,23 +90,38 @@ export async function getSignedUploadUrl(
   mimeType: string,
   expiresIn: number = 300,
 ): Promise<string> {
-  const command = new PutObjectCommand({
-    Bucket: config.storage.bucket,
-    Key: key,
-    ContentType: mimeType,
-    ACL: 'private',
-  });
+  if (s3Client) {
+    const command = new PutObjectCommand({
+      Bucket: config.storage.bucket,
+      Key: key,
+      ContentType: mimeType,
+      ACL: 'private',
+    });
+    return getSignedUrl(s3Client, command, { expiresIn });
+  }
 
-  return getSignedUrl(s3Client, command, { expiresIn });
+  return `/api/attachments/upload-raw`;
 }
 
 export async function deleteFile(key: string): Promise<void> {
-  const command = new DeleteObjectCommand({
-    Bucket: config.storage.bucket,
-    Key: key,
-  });
+  if (s3Client) {
+    const command = new DeleteObjectCommand({
+      Bucket: config.storage.bucket,
+      Key: key,
+    });
+    await s3Client.send(command);
+    return;
+  }
 
-  await s3Client.send(command);
+  const filePath = path.join(UPLOADS_DIR, key.replace(/\//g, '_'));
+  if (fs.existsSync(filePath)) {
+    await fs.promises.unlink(filePath);
+  }
+}
+
+export function getLocalFilePath(key: string): string | null {
+  const filePath = path.join(UPLOADS_DIR, key.replace(/\//g, '_'));
+  return fs.existsSync(filePath) ? filePath : null;
 }
 
 export function generateStorageKey(

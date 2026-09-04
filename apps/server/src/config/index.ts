@@ -35,10 +35,10 @@ export const config = {
   },
 
   storage: {
-    endpoint: requiredEnv('STORAGE_ENDPOINT'),
-    accessKey: requiredEnv('STORAGE_ACCESS_KEY'),
-    secretKey: requiredEnv('STORAGE_SECRET_KEY'),
-    bucket: requiredEnv('STORAGE_BUCKET'),
+    endpoint: optionalEnv('STORAGE_ENDPOINT', ''),
+    accessKey: optionalEnv('STORAGE_ACCESS_KEY', ''),
+    secretKey: optionalEnv('STORAGE_SECRET_KEY', ''),
+    bucket: optionalEnv('STORAGE_BUCKET', 'nexus-storage'),
     region: optionalEnv('STORAGE_REGION', 'us-east-1'),
     publicUrl: optionalEnv('STORAGE_PUBLIC_URL', ''),
   },

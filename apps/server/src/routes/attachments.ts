@@ -216,4 +216,26 @@ router.get('/:id/url', authenticate, async (req, res: Response): Promise<void> =
   }
 });
 
+// ---- GET /api/attachments/raw/:key ----
+router.get('/raw/:key', async (req, res: Response): Promise<void> => {
+  try {
+    const { key } = req.params;
+    const { getLocalFilePath } = require('../lib/storage');
+    const filePath = getLocalFilePath(decodeURIComponent(key));
+    if (!filePath) {
+      res.status(404).json({
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'File not found' },
+      });
+      return;
+    }
+    res.sendFile(filePath);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: { code: 'SERVER_ERROR', message: 'Failed to retrieve file' },
+    });
+  }
+});
+
 export default router;
