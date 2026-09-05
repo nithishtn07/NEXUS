@@ -18,18 +18,6 @@ services:
         value: "30"
       - key: MAX_SESSIONS
         value: "5"
-      - key: STORAGE_ENDPOINT
-        sync: false
-      - key: STORAGE_ACCESS_KEY
-        sync: false
-      - key: STORAGE_SECRET_KEY
-        sync: false
-      - key: STORAGE_BUCKET
-        value: nexus-storage
-      - key: STORAGE_REGION
-        value: us-east-1
-      - key: STORAGE_PUBLIC_URL
-        value: ""
       - key: EXPO_PROJECT_ID
         sync: false
       - key: EXPO_ACCESS_TOKEN
