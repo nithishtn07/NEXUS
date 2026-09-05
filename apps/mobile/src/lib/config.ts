@@ -1,5 +1,5 @@
 const DEFAULT_DEV_HOST = '192.168.29.140:3000';
-const DEFAULT_PROD_URL = 'https://nexus-api.onrender.com';
+const DEFAULT_PROD_URL = 'https://nexus-api-ie4z.onrender.com';
 const DEFAULT_STAGING_URL = 'https://nexus-api-staging.onrender.com';
 
 const ENV = {
