@@ -55,7 +55,7 @@ export const config = {
   rateLimit: {
     login: {
       windowMs: 15 * 60 * 1000, // 15 minutes
-      max: parseInt(optionalEnv('LOGIN_RATE_LIMIT', '5'), 10),
+      max: parseInt(optionalEnv('LOGIN_RATE_LIMIT', '30'), 10),
     },
     invitation: {
       windowMs: 15 * 60 * 1000,

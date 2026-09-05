@@ -6,6 +6,7 @@ export const loginRateLimit = rateLimit({
   max: config.rateLimit.login.max,
   standardHeaders: true,
   legacyHeaders: false,
+  skipSuccessfulRequests: true,
   message: {
     success: false,
     error: {
@@ -14,7 +15,12 @@ export const loginRateLimit = rateLimit({
     },
   },
   keyGenerator: (req) => {
-    return req.ip || req.socket.remoteAddress || 'unknown';
+    return (
+      (req.headers['x-forwarded-for'] as string)?.split(',')[0].trim() ||
+      req.ip ||
+      req.socket.remoteAddress ||
+      'unknown'
+    );
   },
 });
 

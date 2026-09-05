@@ -19,6 +19,9 @@ import callRoutes from './routes/calls';
 const app = express();
 const server = http.createServer(app);
 
+// Trust proxy for Render/Cloudflare reverse proxy
+app.set('trust proxy', 1);
+
 // ---- Middleware ----
 app.use(helmet());
 app.use(cors({
