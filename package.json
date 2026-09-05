@@ -11,6 +11,8 @@
     "expo-router": "~57.0.18"
   },
   "scripts": {
+    "build": "cd apps/server && npx prisma generate && npm run build",
+    "start": "cd apps/server && bash start.sh",
     "dev:server": "cd apps/server && npm run dev",
     "dev:mobile": "cd apps/mobile && npx expo start",
     "build:server": "cd apps/server && npm run build",
